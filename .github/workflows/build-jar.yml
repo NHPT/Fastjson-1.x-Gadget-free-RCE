@@ -1,8 +1,8 @@
 # Fastjson 1.2.83 @JSONType RCE Lab - JAR 构建工作流
 #
 # 工作方式:
-#   1. 构建 lab JAR 和 probe.jar
-#   2. 自动提交到仓库（lab/app.jar, poc/probe.jar）
+#   1. 构建 lab/app.jar 和 poc/probe
+#   2. 自动提交到仓库（lab/app.jar, poc/probe）
 #   3. 用户只需 git pull → docker-compose up
 #
 # 触发条件:
@@ -43,26 +43,22 @@ jobs:
           mvn -q -DskipTests clean package
           ls -lh target/fastjson-rce-lab-1.0.0.jar
 
-      # ── PoC: 编译 GenProbe + 打包 probe ────────────────────────
-      - name: Build PoC probe (javac)
+      # ── PoC: 编译 GenProbe + 修补 class 内部名 + 打包 probe ─────
+      - name: Build PoC probe
         run: |
           cd poc
           wget -q "https://repo1.maven.org/maven2/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar" \
             -O fastjson-1.2.83.jar
-          javac -cp fastjson-1.2.83.jar -d . GenProbe.java
-          ls -lh com/alibaba/fastjson/poc/GenProbe.class
-          # JAR 入口名为 GenProbe（无 .class），匹配 JAR URL 的 entry 路径
-          cp com/alibaba/fastjson/poc/GenProbe.class GenProbe
-          jar cf probe GenProbe
-          rm GenProbe
+          python3 serve.py --build-only --force-build
+          jar tf probe
           ls -lh probe
 
       # ── 复制到仓库目录 ──────────────────────────────────────
       - name: Copy JARs to repo
         run: |
-          # lab JAR → lab/app.jar（Dockerfile 直接 COPY 此文件）
+          # lab JAR → lab/app.jar
           cp lab/target/fastjson-rce-lab-1.0.0.jar lab/app.jar
-          # probe.jar 已在 poc/ 目录下
+          # PoC JAR 文件名固定为 poc/probe（无 .jar 后缀）
 
       # ── 提交回仓库 ──────────────────────────────────────────
       - name: Commit JARs back to repo
@@ -93,10 +89,10 @@ jobs:
           echo "| 产物 | 路径 | 大小 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| lab JAR | \`lab/app.jar\` | $(ls -lh lab/app.jar | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| probe JAR | \`poc/probe\` | $(ls -lh poc/probe | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| poc/probe | \`poc/probe\` | $(ls -lh poc/probe | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "使用方式:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "git pull" >> $GITHUB_STEP_SUMMARY
-          echo "cd lab && docker-compose up -d --build" >> $GITHUB_STEP_SUMMARY
+          echo "cd lab && docker-compose up -d" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

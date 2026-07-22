@@ -1,9 +1,8 @@
-version: "3.9"
-
 services:
   victim:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: eclipse-temurin:8-jre-jammy
     ports:
       - "18080:18080"
+    volumes:
+      - ./app.jar:/app/app.jar
+    entrypoint: ["java", "-Djava.net.useSystemProxies=false", "-jar", "/app/app.jar"]
