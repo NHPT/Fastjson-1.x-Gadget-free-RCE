@@ -43,16 +43,19 @@ jobs:
           mvn -q -DskipTests clean package
           ls -lh target/fastjson-rce-lab-1.0.0.jar
 
-      # ── PoC: 编译 GenProbe + 打包 probe.jar ────────────────
-      - name: Build PoC probe.jar (javac)
+      # ── PoC: 编译 GenProbe + 打包 probe ────────────────────────
+      - name: Build PoC probe (javac)
         run: |
           cd poc
           wget -q "https://repo1.maven.org/maven2/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar" \
             -O fastjson-1.2.83.jar
           javac -cp fastjson-1.2.83.jar -d . GenProbe.java
           ls -lh com/alibaba/fastjson/poc/GenProbe.class
-          jar cf probe.jar com/alibaba/fastjson/poc/GenProbe.class
-          ls -lh probe.jar
+          # JAR 入口名为 GenProbe（无 .class），匹配 JAR URL 的 entry 路径
+          cp com/alibaba/fastjson/poc/GenProbe.class GenProbe
+          jar cf probe GenProbe
+          rm GenProbe
+          ls -lh probe
 
       # ── 复制到仓库目录 ──────────────────────────────────────
       - name: Copy JARs to repo
@@ -68,7 +71,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
           # 强制添加（忽略可能的 .gitignore）
-          git add -f lab/app.jar poc/probe.jar
+          git add -f lab/app.jar poc/probe
 
           # 只在有变更时提交
           if git diff --cached --quiet; then
@@ -78,7 +81,7 @@ jobs:
 
             Built by GitHub Actions workflow: Build JARs
             - lab/app.jar: Spring Boot FatJar (Fastjson 1.2.83 RCE lab)
-            - poc/probe.jar: PoC malicious class with @JSONType"
+            - poc/probe: PoC malicious class JAR with @JSONType"
             git push
           fi
 
@@ -90,7 +93,7 @@ jobs:
           echo "| 产物 | 路径 | 大小 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|------|" >> $GITHUB_STEP_SUMMARY
           echo "| lab JAR | \`lab/app.jar\` | $(ls -lh lab/app.jar | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| probe.jar | \`poc/probe.jar\` | $(ls -lh poc/probe.jar | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| probe JAR | \`poc/probe\` | $(ls -lh poc/probe | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "使用方式:" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY

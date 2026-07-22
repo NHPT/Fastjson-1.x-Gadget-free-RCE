@@ -5,7 +5,7 @@
 # 用户只需 git pull → docker-compose up -d --build
 # ============================================================
 
-FROM eclipse-temurin:8-jre
+FROM eclipse-temurin:8-jre-slim
 
 WORKDIR /app
 COPY app.jar /app/app.jar
