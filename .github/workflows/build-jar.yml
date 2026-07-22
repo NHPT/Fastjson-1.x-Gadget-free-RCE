@@ -49,7 +49,8 @@ jobs:
           cd poc
           wget -q "https://repo1.maven.org/maven2/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar" \
             -O fastjson-1.2.83.jar
-          javac -cp fastjson-1.2.83.jar GenProbe.java
+          javac -cp fastjson-1.2.83.jar -d . GenProbe.java
+          ls -lh com/alibaba/fastjson/poc/GenProbe.class
           jar cf probe.jar com/alibaba/fastjson/poc/GenProbe.class
           ls -lh probe.jar
 

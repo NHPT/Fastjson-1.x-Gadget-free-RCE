@@ -30,16 +30,11 @@ if [ ! -f "$FASTJSON_JAR" ]; then
     echo "[+] 下载完成"
 fi
 
-echo "[*] 编译 GenProbe.java..."
-javac -cp "$FASTJSON_JAR" GenProbe.java
+echo "[*] 编译 GenProbe.java（-d . 创建包目录结构）..."
+javac -cp "$FASTJSON_JAR" -d . GenProbe.java
 
 echo "[*] 打包为 $PROBE_JAR..."
-jar cf "$PROBE_JAR" \
-    com/alibaba/fastjson/poc/GenProbe.class \
-    com/alibaba/fastjson/poc/GenProbe\$Inner.class 2>/dev/null || {
-    # 如果 Inner 类不存在，只打包 GenProbe
-    jar cf "$PROBE_JAR" com/alibaba/fastjson/poc/GenProbe.class
-}
+jar cf "$PROBE_JAR" com/alibaba/fastjson/poc/GenProbe.class
 
 echo "[+] 构建完成: $PROBE_JAR"
 echo ""
