@@ -1,0 +1,98 @@
+# Fastjson 1.2.83 @JSONType RCE Lab - JAR 构建工作流
+#
+# 工作方式:
+#   1. 构建 lab JAR 和 probe.jar
+#   2. 自动提交到仓库（lab/app.jar, poc/probe.jar）
+#   3. 用户只需 git pull → docker-compose up
+#
+# 触发条件:
+#   - push 到 main 分支（含 lab/ 或 poc/ 变更）
+#   - 手动触发 (workflow_dispatch)
+
+name: Build JARs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "lab/**"
+      - "poc/**"
+      - ".github/workflows/build-jar.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 需要写入权限以提交 JAR
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "8"
+
+      # ── Lab: Spring Boot FatJar ──────────────────────────────
+      - name: Build lab JAR (Maven)
+        run: |
+          cd lab
+          mvn -q -DskipTests clean package
+          ls -lh target/fastjson-rce-lab-1.0.0.jar
+
+      # ── PoC: 编译 GenProbe + 打包 probe.jar ────────────────
+      - name: Build PoC probe.jar (javac)
+        run: |
+          cd poc
+          wget -q "https://repo1.maven.org/maven2/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar" \
+            -O fastjson-1.2.83.jar
+          javac -cp fastjson-1.2.83.jar GenProbe.java
+          jar cf probe.jar com/alibaba/fastjson/poc/GenProbe.class
+          ls -lh probe.jar
+
+      # ── 复制到仓库目录 ──────────────────────────────────────
+      - name: Copy JARs to repo
+        run: |
+          # lab JAR → lab/app.jar（Dockerfile 直接 COPY 此文件）
+          cp lab/target/fastjson-rce-lab-1.0.0.jar lab/app.jar
+          # probe.jar 已在 poc/ 目录下
+
+      # ── 提交回仓库 ──────────────────────────────────────────
+      - name: Commit JARs back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 强制添加（忽略可能的 .gitignore）
+          git add -f lab/app.jar poc/probe.jar
+
+          # 只在有变更时提交
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: auto-build JARs [skip ci]
+
+            Built by GitHub Actions workflow: Build JARs
+            - lab/app.jar: Spring Boot FatJar (Fastjson 1.2.83 RCE lab)
+            - poc/probe.jar: PoC malicious class with @JSONType"
+            git push
+          fi
+
+      # ── 构建摘要 ────────────────────────────────────────────
+      - name: Build summary
+        run: |
+          echo "## ✅ 构建完成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 产物 | 路径 | 大小 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| lab JAR | \`lab/app.jar\` | $(ls -lh lab/app.jar | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| probe.jar | \`poc/probe.jar\` | $(ls -lh poc/probe.jar | awk '{print \$5}') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "使用方式:" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "git pull" >> $GITHUB_STEP_SUMMARY
+          echo "cd lab && docker-compose up -d --build" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

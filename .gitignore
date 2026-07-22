@@ -1,0 +1,17 @@
+# Maven 构建输出
+lab/target/
+poc/fastjson-1.2.83.jar
+poc/com/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
