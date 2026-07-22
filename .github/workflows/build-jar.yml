@@ -50,7 +50,7 @@ jobs:
           wget -q "https://repo1.maven.org/maven2/com/alibaba/fastjson/1.2.83/fastjson-1.2.83.jar" \
             -O fastjson-1.2.83.jar
           python3 serve.py --build-only --force-build
-          jar tf probe
+          "$JAVA_HOME/bin/jar" tf probe
           ls -lh probe
 
       # ── 复制到仓库目录 ──────────────────────────────────────

@@ -90,6 +90,9 @@ def is_ipv4(value: str) -> bool:
 def find_java_tool(name: str) -> str:
     """查找可执行的 Java 工具，避开 macOS /usr/bin/java 启动桩。"""
     candidates = []
+    java_home = os.environ.get("JAVA_HOME")
+    if java_home:
+        candidates.append(os.path.join(java_home, "bin", name))
     found = shutil.which(name)
     if found:
         candidates.append(found)
@@ -101,8 +104,14 @@ def find_java_tool(name: str) -> str:
         if not candidate or not os.path.exists(candidate):
             continue
         try:
-            version_arg = "--version" if name == "jar" else "-version"
-            subprocess.run([candidate, version_arg], capture_output=True, check=True)
+            if name == "jar":
+                # JDK 8 的 jar 不支持 --version；能输出用法即可说明工具可执行。
+                result = subprocess.run([candidate], capture_output=True, text=True)
+                output = (result.stdout or "") + (result.stderr or "")
+                if "Usage:" in output or "用法:" in output or "jar" in output:
+                    return candidate
+                continue
+            subprocess.run([candidate, "-version"], capture_output=True, check=True)
             return candidate
         except (FileNotFoundError, subprocess.CalledProcessError):
             continue
